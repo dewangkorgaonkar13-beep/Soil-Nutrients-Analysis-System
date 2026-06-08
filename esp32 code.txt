@@ -1,0 +1,162 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+// ---------------- WiFi ----------------
+const char* ssid = "Dewang";
+const char* password = "shadow2004";
+
+// ---------------- Flask local server ----------------
+// Replace with your laptop IPv4 if it changes
+const char* serverURL = "http://10.189.42.123:7000/esp32-data";
+
+// ---------------- RS485 / MAX485 ----------------
+#define RXD2 16
+#define TXD2 17
+#define RE_DE 4   // DE and RE connected together
+
+// Modbus request: slave 1, function 03, start 0000, read 7 registers
+uint8_t byteRequest[8] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x07, 0x04, 0x08};
+uint8_t byteResponse[19];
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+
+  Serial.println("ESP32 Starting...");
+
+  Serial2.begin(4800, SERIAL_8N1, RXD2, TXD2);
+
+  pinMode(RE_DE, OUTPUT);
+  digitalWrite(RE_DE, LOW);   // receive mode
+
+  connectWiFi();
+}
+
+void loop() {
+  readAndSendSensorData();
+  delay(5000);
+}
+
+void connectWiFi() {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+
+  Serial.print("Connecting to WiFi");
+  int retry = 0;
+
+  while (WiFi.status() != WL_CONNECTED && retry < 30) {
+    delay(500);
+    Serial.print(".");
+    retry++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nWiFi connected");
+    Serial.print("ESP32 IP: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\nWiFi failed");
+  }
+}
+
+void readAndSendSensorData() {
+  while (Serial2.available()) {
+    Serial2.read();
+  }
+
+  // Send Modbus request
+  digitalWrite(RE_DE, HIGH);
+  delay(2);
+  Serial2.write(byteRequest, sizeof(byteRequest));
+  Serial2.flush();
+  delay(2);
+  digitalWrite(RE_DE, LOW);
+
+  // Read Modbus response
+  unsigned long startTime = millis();
+  int index = 0;
+
+  while ((millis() - startTime) < 1000 && index < 19) {
+    if (Serial2.available()) {
+      byteResponse[index++] = Serial2.read();
+    }
+  }
+
+  if (index == 19 && byteResponse[0] == 0x01 && byteResponse[1] == 0x03) {
+    float moisture = ((byteResponse[3] << 8) | byteResponse[4]) / 10.0;
+    float temp     = ((byteResponse[5] << 8) | byteResponse[6]) / 10.0;
+    int ec         = ((byteResponse[7] << 8) | byteResponse[8]);
+    float ph       = ((byteResponse[9] << 8) | byteResponse[10]) / 10.0;
+    int n          = ((byteResponse[11] << 8) | byteResponse[12]);
+    int p          = ((byteResponse[13] << 8) | byteResponse[14]);
+    int k          = ((byteResponse[15] << 8) | byteResponse[16]);
+
+    Serial.println("------ SENSOR DATA ------");
+    Serial.print("Moisture: "); Serial.print(moisture); Serial.println(" %");
+    Serial.print("Temperature: "); Serial.print(temp); Serial.println(" C");
+    Serial.print("EC: "); Serial.println(ec);
+    Serial.print("pH: "); Serial.println(ph);
+    Serial.print("N: "); Serial.println(n);
+    Serial.print("P: "); Serial.println(p);
+    Serial.print("K: "); Serial.println(k);
+    Serial.println("-------------------------");
+
+    sendToServer(n, p, k, ph, temp, moisture, ec);
+  } else {
+    Serial.println("No valid response from sensor");
+  }
+}
+
+void sendToServer(int n, int p, int k, float ph, float temp, float moisture, int ec) {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi not connected");
+    return;
+  }
+
+  HTTPClient http;
+  http.setTimeout(3000);
+
+  Serial.println("Connecting to server...");
+
+  if (!http.begin(serverURL)) {
+    Serial.println("http.begin FAILED");
+    return;
+  }
+
+  Serial.println("Connected!");
+
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Accept", "*/*");
+  http.addHeader("Connection", "close");
+
+  String jsonData = "{";
+  jsonData += "\"N\":" + String(n) + ",";
+  jsonData += "\"P\":" + String(p) + ",";
+  jsonData += "\"K\":" + String(k) + ",";
+  jsonData += "\"ph\":" + String(ph, 1) + ",";
+  jsonData += "\"temperature\":" + String(temp, 1) + ",";
+  jsonData += "\"moisture\":" + String(moisture, 1) + ",";
+  jsonData += "\"ec\":" + String(ec) + ",";
+  jsonData += "\"rainfall\":100";
+  jsonData += "}";
+
+  Serial.print("Sending JSON: ");
+  Serial.println(jsonData);
+
+  Serial.println("Sending request...");
+  WiFiClient *stream = http.getStreamPtr();
+int httpCode = http.POST(jsonData);
+  Serial.print("HTTP Status: ");
+  Serial.println(httpCode);
+
+  if (httpCode > 0) {
+    String response = http.getString();
+    Serial.print("Server Response: ");
+    Serial.println(response);
+  } else {
+    Serial.print("HTTP Error: ");
+    Serial.println(http.errorToString(httpCode));
+  }
+
+  http.end();
+}
