@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoilSense AI | Recommended Crop</title>
+    <style>
+        :root {
+            --primary: #27ae60;
+            --dark: #2c3e50;
+            --light: #f4f7f6;
+            --accent: #e67e22;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--light);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* Container Styling */
+        .prediction-container {
+            max-width: 550px;
+            width: 90%;
+            margin: 60px auto;
+            background: var(--white);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            text-align: center;
+            overflow: hidden;
+        }
+
+        .header-box {
+            background: var(--accent);
+            color: white;
+            padding: 35px;
+        }
+
+        .header-box h2 { margin: 0; font-size: 1.8rem; }
+        .header-box p { margin: 10px 0 0; opacity: 0.9; font-size: 0.9rem; }
+
+        .content-box {
+            padding: 40px;
+        }
+
+        .description {
+            color: #7f8c8d;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        /* AI Processing Animation */
+        .loader-wrapper {
+            display: none;
+            margin: 20px auto;
+        }
+
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid var(--accent);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Result Display Section */
+        #result-display {
+            margin-top: 20px;
+            padding: 30px;
+            border-radius: 15px;
+            background: #fff9f2;
+            border: 2px solid #ffebd4;
+            display: none; /* Hidden until button is clicked */
+        }
+
+        .crop-label {
+            font-size: 0.85rem;
+            color: #a0a0a0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+        }
+
+        .crop-name {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: var(--accent);
+            margin: 10px 0;
+        }
+
+        .success-badge {
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        /* Button Styling */
+        .btn-predict {
+            width: 100%;
+            padding: 18px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 4px 15px rgba(230, 126, 34, 0.3);
+        }
+
+        .btn-predict:hover {
+            background: #d35400;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(230, 126, 34, 0.4);
+        }
+
+        .back-link {
+            margin-top: 25px;
+            text-decoration: none;
+            color: var(--dark);
+            font-weight: 600;
+            transition: 0.3s;
+        }
+
+        .back-link:hover { color: var(--accent); }
+    </style>
+</head>
+<body>
+
+    <div class="prediction-container">
+        <div class="header-box">
+            <h2>🧠 Recommended Crop</h2>
+            <p>XGBoost Intelligence • Real-time Soil Analysis</p>
+        </div>
+
+        <div class="content-box">
+            <p class="description">
+                Our Machine Learning model analyzes your live Nitrogen, Phosphorus, Potassium, pH, and climate data to suggest the most suitable crop for your soil.
+            </p>
+            
+            <button id="predictBtn" onclick="runMLPrediction()" class="btn-predict">FIND RECOMMENDED CROP</button>
+
+            <div id="loader-wrapper" class="loader-wrapper">
+                <div class="loader"></div>
+                <p style="color: var(--accent); font-weight: 600;">Analyzing Soil Profile...</p>
+            </div>
+
+            <div id="result-display">
+                <div class="crop-label">Best Match for Your Land</div>
+                <div id="crop-result" class="crop-name">--</div>
+                <div class="success-badge">✓ Optimal Conditions Detected</div>
+            </div>
+        </div>
+    </div>
+
+    <a href="/" class="back-link">← Back to Live Dashboard</a>
+
+    <script>
+        function runMLPrediction() {
+            const btn = document.getElementById("predictBtn");
+            const loader = document.getElementById("loader-wrapper");
+            const resultDisplay = document.getElementById("result-display");
+            const cropResult = document.getElementById("crop-result");
+
+            // UI Reset: Hide button and result, show loader
+            btn.style.display = "none";
+            resultDisplay.style.display = "none";
+            loader.style.display = "block";
+
+            // Trigger the API call to your Flask backend
+            fetch('/api/mode2', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}) // Backend uses global latest_sensor_data
+            })
+            .then(res => res.json())
+            .then(data => {
+                // Add a small delay so the user can see the "Analyzing" animation
+                setTimeout(() => {
+                    loader.style.display = "none";
+                    btn.style.display = "block";
+                    btn.innerText = "REFRESH RECOMMENDATION";
+                    
+                    if(data.status === "success") {
+                        resultDisplay.style.display = "block";
+                        // Display the crop name in uppercase for impact
+                        cropResult.innerText = data.recommended_crop.toUpperCase();
+                    } else {
+                        alert("AI Error: " + data.message);
+                    }
+                }, 1200);
+            })
+            .catch(err => {
+                loader.style.display = "none";
+                btn.style.display = "block";
+                console.error("ML Prediction Error:", err);
+                alert("Failed to connect to AI Model. Is app.py running?");
+            });
+        }
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoilSense | Live Dashboard</title>
+    <style>
+        :root {
+            --primary: #27ae60;
+            --dark: #2c3e50;
+            --light: #f0f4f3;
+            --accent: #e67e22;
+            --white: #ffffff;
+            --water: #3498db;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--light);
+            margin: 0;
+            color: var(--dark);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Navigation Bar */
+        nav {
+            background: var(--primary);
+            color: white;
+            padding: 1rem 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .logo { font-size: 1.6rem; font-weight: 800; letter-spacing: 1px; }
+        .status-container { display: flex; align-items: center; gap: 20px; font-size: 0.85rem; }
+        .status-item { display: flex; align-items: center; gap: 5px; }
+        .status-dot { height: 8px; width: 8px; background-color: #2ecc71; border-radius: 50%; }
+
+        /* Hero Header */
+        .hero {
+            text-align: center;
+            padding: 30px 20px;
+            background: var(--white);
+            margin-bottom: 25px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .hero h1 { margin: 0; font-size: 2rem; }
+        .hero p { color: #7f8c8d; margin-top: 8px; font-size: 1rem; }
+
+        /* Sensor Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            padding: 0 5%;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 90%;
+        }
+
+        .card {
+            background: var(--white);
+            padding: 25px;
+            border-radius: 18px;
+            text-align: center;
+            transition: 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-top: 5px solid transparent;
+        }
+
+        .card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+
+        /* Color Coding */
+        .card.n { border-color: #27ae60; }
+        .card.p { border-color: #2980b9; }
+        .card.k { border-color: #8e44ad; }
+        .card.ph { border-color: #f1c40f; }
+        .card.rain { border-color: var(--water); background-color: #f0f7fc; }
+        .card.temp { border-color: #e74c3c; }
+
+        .label { font-size: 0.8rem; text-transform: uppercase; font-weight: 700; color: #95a5a6; margin-bottom: 12px; display: block; }
+        .value { font-size: 2.6rem; font-weight: 800; color: var(--dark); line-height: 1; }
+        .unit { font-size: 0.9rem; color: #bdc3c7; margin-top: 8px; display: block; }
+
+        /* Action Buttons */
+        .actions { text-align: center; margin: 40px 0; }
+        .btn {
+            padding: 16px 35px;
+            margin: 10px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-block;
+            transition: 0.3s;
+        }
+
+        .btn-predict { background: var(--accent); color: white; box-shadow: 0 4px 15px rgba(230, 126, 34, 0.3); }
+        .btn-fert { background: var(--primary); color: white; box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3); }
+        .btn:hover { transform: scale(1.05); opacity: 0.9; }
+
+        footer { margin-top: auto; padding: 20px; color: #95a5a6; font-size: 0.75rem; text-align: center; border-top: 1px solid #eee; }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="logo">🌱 SOILSENSE </div>
+        <div class="status-container">
+            <div class="status-item" id="location-text">📍 Locating Farm...</div>
+            <div class="status-item"><span class="status-dot"></span> Node: Online</div>
+        </div>
+    </nav>
+
+    <div class="hero">
+        <h1>Farm Intelligence Dashboard</h1>
+        <p>Real-time Soil Analysis & Predictive Modeling</p>
+    </div>
+
+    <div class="grid">
+        <div class="card n">
+            <span class="label">Nitrogen (N)</span>
+            <span class="value" id="val-N">--</span>
+            <span class="unit">mg/kg (Soil)</span>
+        </div>
+        <div class="card p">
+            <span class="label">Phosphorus (P)</span>
+            <span class="value" id="val-P">--</span>
+            <span class="unit">mg/kg (Soil)</span>
+        </div>
+        <div class="card k">
+            <span class="label">Potassium (K)</span>
+            <span class="value" id="val-K">--</span>
+            <span class="unit">mg/kg (Soil)</span>
+        </div>
+
+        <div class="card rain">
+            <span class="label">🌧️ Live Rainfall</span>
+            <span class="value" id="val-rain">--</span>
+            <span class="unit">mm (Weather API)</span>
+        </div>
+        <div class="card temp">
+            <span class="label">🌡️ Temperature</span>
+            <span class="value" id="val-temp">--</span>
+            <span class="unit">°Celsius</span>
+        </div>
+        <div class="card ph">
+            <span class="label">🧪 Soil pH</span>
+            <span class="value" id="val-ph">--</span>
+            <span class="unit">Acidity Level</span>
+        </div>
+    </div>
+
+    <div class="actions">
+        <a href="/mode2" class="btn btn-predict">RECOMMENDED CROP</a>
+        <a href="/mode1" class="btn btn-fert">FERTILIZER GUIDE</a>
+    </div>
+
+    <footer>
+        &copy; 2026 SoilSense  • Automated Geolocation & XGBoost Inference Engine
+    </footer>
+
+    <script>
+        // --- BROWSER GEOLOCATION ---
+        function syncLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    const lat = pos.coords.latitude;
+                    const lon = pos.coords.longitude;
+                    document.getElementById('location-text').innerText = `📍 ${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+
+                    fetch('/update-location', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ latitude: lat, longitude: lon })
+                    });
+                });
+            }
+        }
+
+        // --- DATA POLLING ---
+        function updateDashboard() {
+            fetch('/latest-data')
+                .then(res => res.json())
+                .then(data => {
+                    const s = data.sensor_data;
+                    document.getElementById('val-N').innerText = s.N || 0;
+                    document.getElementById('val-P').innerText = s.P || 0;
+                    document.getElementById('val-K').innerText = s.K || 0;
+                    document.getElementById('val-ph').innerText = (s.ph || 7.0).toFixed(1);
+                    document.getElementById('val-temp').innerText = (s.temperature || 25).toFixed(1);
+                    document.getElementById('val-rain').innerText = (s.rainfall || 0).toFixed(2);
+                })
+                .catch(err => console.error("Update failed:", err));
+        }
+
+        window.onload = () => {
+            syncLocation();
+            updateDashboard();
+            setInterval(updateDashboard, 2000); // 2-second refresh
+        };
+    </script>
+
+</body>
+</html>

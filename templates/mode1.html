@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoilSense AI | Fertilizer Optimizer</title>
+    <style>
+        :root {
+            --primary: #27ae60;
+            --dark: #2c3e50;
+            --light: #f4f7f6;
+            --accent: #e67e22;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--light);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* Container Styling */
+        .fert-container {
+            max-width: 500px;
+            width: 90%;
+            margin: 50px auto;
+            background: var(--white);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+        }
+
+        .header-box {
+            background: var(--primary);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header-box h2 { margin: 0; font-size: 1.8rem; }
+        .header-box p { margin: 10px 0 0; opacity: 0.9; font-size: 0.9rem; }
+
+        .content-box {
+            padding: 30px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        /* Dropdown Styling */
+        select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+            font-size: 1rem;
+            margin-bottom: 20px;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        select:focus { border-color: var(--primary); }
+
+        /* Button Styling */
+        .btn-calc {
+            width: 100%;
+            padding: 15px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .btn-calc:hover {
+            background: #219150;
+            transform: translateY(-2px);
+        }
+
+        /* Result Section */
+        .result-grid {
+            display: none; /* Hidden by default */
+            margin-top: 30px;
+            background: #f9fdfb;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px dashed var(--primary);
+        }
+
+        .res-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .res-row:last-child { border: none; }
+
+        .res-name { font-weight: 600; color: #7f8c8d; }
+        .res-val { color: var(--accent); font-weight: bold; font-size: 1.1rem; }
+
+        .back-link {
+            margin-top: 20px;
+            text-decoration: none;
+            color: var(--primary);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="fert-container">
+        <div class="header-box">
+            <h2>🚜 Fertilizer Optimizer</h2>
+            <p>Precise nutrient matching based on live soil data</p>
+        </div>
+
+        <div class="content-box">
+            <label for="cropDropdown">Which crop are you growing?</label>
+            <select id="cropDropdown">
+                {% for crop in crops %}
+                <option value="{{ crop }}">{{ crop.capitalize() }}</option>
+                {% endfor %}
+            </select>
+
+            <button onclick="getRecommendation()" class="btn-calc">Calculate Deficiency</button>
+
+            <div id="result-area" class="result-grid">
+                <div class="res-row">
+                    <span class="res-name">Urea (Nitrogen)</span>
+                    <span class="res-val" id="urea-val">--</span>
+                </div>
+                <div class="res-row">
+                    <span class="res-name">DAP (Phosphorus)</span>
+                    <span class="res-val" id="dap-val">--</span>
+                </div>
+                <div class="res-row">
+                    <span class="res-name">MOP (Potassium)</span>
+                    <span class="res-val" id="mop-val">--</span>
+                </div>
+                <p style="font-size: 0.75rem; color: #95a5a6; margin-top: 15px; text-align: center;">
+                    *Values shown in kg/acre based on sensor readings.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <a href="/" class="back-link">← Return to Dashboard</a>
+
+    <script>
+        function getRecommendation() {
+            const crop = document.getElementById("cropDropdown").value;
+            const resultArea = document.getElementById("result-area");
+
+            // Show loading state
+            document.querySelector('.btn-calc').innerText = "Analyzing...";
+
+            fetch('/api/mode1', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ crop: crop })
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.querySelector('.btn-calc').innerText = "Calculate Deficiency";
+                
+                if(data.error) {
+                    alert("Error: " + data.error);
+                } else {
+                    // Show the hidden result box
+                    resultArea.style.display = "block";
+                    
+                    // Update the values
+                    document.getElementById("urea-val").innerText = data.fertilizer_plan.Urea_needed + " kg";
+                    document.getElementById("dap-val").innerText = data.fertilizer_plan.DAP_needed + " kg";
+                    document.getElementById("mop-val").innerText = data.fertilizer_plan.MOP_needed + " kg";
+                }
+            })
+            .catch(err => {
+                document.querySelector('.btn-calc').innerText = "Calculate Deficiency";
+                console.error(err);
+                alert("Connection lost. Make sure app.py is running!");
+            });
+        }
+    </script>
+
+</body>
+</html>
